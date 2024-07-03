@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Order Drag and Drop</title>
+    <style>
+        .status-column {
+            width: 30%;
+            float: left;
+            padding: 10px;
+            border: 1px solid #000;
+            min-height: 300px;
+        }
+
+        .order {
+            padding: 10px;
+            margin: 5px;
+            background-color: #f0f0f0;
+            border: 1px solid #000;
+            cursor: move;
+        }
+    </style>
+</head>
+<body>
+<h1>Order Management</h1>
+<div class="status-column" id="OPEN" ondrop="drop(event)" ondragover="allowDrop(event)">
+    <h2>Open</h2>
+    <div th:each="order : ${openOrders}" class="order" th:attr="draggable='true', id=${order.id}"
+         ondragstart="drag(event)">
+        <span th:text="${order.id}"></span>
+    </div>
+</div>
+<div class="status-column" id="IN_PROGRESS" ondrop="drop(event)" ondragover="allowDrop(event)">
+    <h2>In Progress</h2>
+    <div th:each="order : ${inProgressOrders}" class="order" th:attr="draggable='true', id=${order.id}"
+         ondragstart="drag(event)">
+        <span th:text="${order.id}"></span>
+    </div>
+</div>
+<div class="status-column" id="COMPLETED" ondrop="drop(event)" ondragover="allowDrop(event)">
+    <h2>Completed</h2>
+    <div th:each="order : ${completedOrders}" class="order" th:attr="draggable='true', id=${order.id}"
+         ondragstart="drag(event)">
+        <span th:text="${order.id}"></span>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+<script>
+    let stompClient = null;
+    connect()
+    function connect() {
+        stompClient = Stomp.over(new SockJS('http://localhost:8080/ws'));
+        stompClient.connect({}, function (frame) {
+            stompClient.subscribe('/topic/orders', function (newOrder) {
+                let order = JSON.parse(newOrder.body);
+                let open = document.getElementById("OPEN");
+                open.innerHTML += `
+                        <div class="order" draggable="true" id="${order.id}"
+                                ondragstart="drag(event)">
+                            <span>${order.id}</span>
+                        </div>`
+            });
+        });
+    }
+
+    function allowDrop(ev) {
+        ev.preventDefault();
+    }
+
+    function drag(ev) {
+        ev.dataTransfer.setData("text", ev.target.id);
+    }
+
+    function drop(ev) {
+        ev.preventDefault();
+        var data = ev.dataTransfer.getData("text");
+        var orderElement = document.getElementById(data);
+        ev.target.appendChild(orderElement);
+        console.log("Order ID: " + data + " moved to " + ev.target.id);
+
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "/updateOrderStatus", true);
+        xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.send(JSON.stringify({id: data, status: ev.target.id}));
+    }
+</script>
+</body>
+</html>
